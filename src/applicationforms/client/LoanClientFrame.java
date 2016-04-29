@@ -6,7 +6,12 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Properties;
 
+import javax.jms.*;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -17,6 +22,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 
+import mix.Constants;
 import mix.messaging.*;
 import mix.loan.*;
 
@@ -35,6 +41,12 @@ public class LoanClientFrame extends JFrame {
     private JLabel lblNewLabel;
     private JLabel lblNewLabel_1;
     private JTextField tfTime;
+
+    private Connection connection; // to connect to the ActiveMQ
+    private Session session; // session for creating messages, producers and
+
+    private Destination sendDestination; // reference to a queue/topic destination
+    private MessageProducer producer; // for sending messages
 
     /**
      * Create the frame.
@@ -115,7 +127,7 @@ public class LoanClientFrame extends JFrame {
                 LoanRequest request = new LoanRequest(ssn, amount, time);
                 listModel.addElement(new RequestReply<LoanRequest, LoanReply>(request, null));
                 // to do:  send the JMS with request to Loan Broker
-                System.out.println("bla");
+                sendRequest("labas");
             }
         });
         GridBagConstraints gbc_btnQueue = new GridBagConstraints();
@@ -136,6 +148,7 @@ public class LoanClientFrame extends JFrame {
         requestReplyList = new JList<RequestReply<LoanRequest, LoanReply>>(listModel);
         scrollPane.setViewportView(requestReplyList);
 
+        connect();
     }
 
     /**
@@ -169,5 +182,43 @@ public class LoanClientFrame extends JFrame {
                 }
             }
         });
+    }
+
+    private void connect(){
+        try {
+            Properties props = new Properties();
+            props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
+                    "org.apache.activemq.jndi.ActiveMQInitialContextFactory");
+            props.setProperty(Context.PROVIDER_URL, "tcp://localhost:61616");
+
+            props.put(("queue." + Constants.requestLoanClientChanel), Constants.requestLoanClientChanel);
+
+            Context jndiContext = new InitialContext(props);
+            ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
+            connection = connectionFactory.createConnection();
+            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+            // connect to the sender destination
+            sendDestination = (Destination) jndiContext.lookup(Constants.requestLoanClientChanel);
+            producer = session.createProducer(sendDestination);
+        } catch (NamingException e) {
+            e.printStackTrace();
+        } catch (JMSException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendRequest(String s){
+        try {
+            // create a text message
+            Message msg = session.createTextMessage(s);
+            //msg.setJMSReplyTo(receiveDestination);
+
+            // send the message
+            producer.send(msg);
+
+        } catch (JMSException e) {
+            e.printStackTrace();
+        }
     }
 }

@@ -4,7 +4,12 @@ import java.awt.EventQueue;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.util.Properties;
 
+import javax.jms.*;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JList;
@@ -12,6 +17,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.border.EmptyBorder;
 
+import mix.Constants;
 import mix.bank.*;
 import mix.loan.*;
 
@@ -24,21 +30,12 @@ public class LoanBrokerFrame extends JFrame {
 	private JPanel contentPane;
 	private DefaultListModel<JListLine> listModel = new DefaultListModel<JListLine>();
 	private JList<JListLine> list;
+
+	private Connection connection; // to connect to the JMS
+	private Session session; // session for creating consumers
+	private Destination receiveDestination; // reference to a queue/topic destination
+	private MessageConsumer consumer; // for receiving messages
 	
-	public static void main(String[] args) {
-		EventQueue.invokeLater(new Runnable() {
-			public void run() {
-				try {
-					LoanBrokerFrame frame = new LoanBrokerFrame();
-					frame.setVisible(true);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-		});
-	}
-
-
 	/**
 	 * Create the frame.
 	 */
@@ -55,7 +52,7 @@ public class LoanBrokerFrame extends JFrame {
 		gbl_contentPane.columnWeights = new double[]{1.0, 0.0, 1.0, 0.0, 0.0, Double.MIN_VALUE};
 		gbl_contentPane.rowWeights = new double[]{1.0, 0.0, Double.MIN_VALUE};
 		contentPane.setLayout(gbl_contentPane);
-		
+
 		JScrollPane scrollPane = new JScrollPane();
 		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
 		gbc_scrollPane.gridwidth = 7;
@@ -64,12 +61,27 @@ public class LoanBrokerFrame extends JFrame {
 		gbc_scrollPane.gridx = 0;
 		gbc_scrollPane.gridy = 0;
 		contentPane.add(scrollPane, gbc_scrollPane);
-		
+
 		list = new JList<JListLine>(listModel);
-		scrollPane.setViewportView(list);		
+		scrollPane.setViewportView(list);
+
+		subscribe();
 	}
-	
-	 private JListLine getRequestReply(LoanRequest request){    
+
+	public static void main(String[] args) {
+		EventQueue.invokeLater(new Runnable() {
+			public void run() {
+				try {
+					LoanBrokerFrame frame = new LoanBrokerFrame();
+					frame.setVisible(true);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
+	private JListLine getRequestReply(LoanRequest request){
 	     
 	     for (int i = 0; i < listModel.getSize(); i++){
 	    	 JListLine rr =listModel.get(i);
@@ -102,5 +114,46 @@ public class LoanBrokerFrame extends JFrame {
 		}		
 	}
 
+	private void subscribe() {
+		try {
+			Properties props = new Properties();
+			props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
+					"org.apache.activemq.jndi.ActiveMQInitialContextFactory");
+			props.setProperty(Context.PROVIDER_URL, "tcp://localhost:61616");
 
+			props.put(("queue." + Constants.requestLoanClientChanel), Constants.requestLoanClientChanel);
+
+			Context jndiContext = new InitialContext(props);
+			ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
+			connection = connectionFactory.createConnection();
+			session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+			// connect to the receiver destination
+			receiveDestination = (Destination) jndiContext.lookup(Constants.requestLoanClientChanel);
+			consumer = session.createConsumer(receiveDestination);
+
+			connection.start(); // this is needed to start receiving messages
+
+		} catch (NamingException | JMSException e) {
+			e.printStackTrace();
+		}
+
+		try {
+			consumer.setMessageListener(new MessageListener() {
+
+				@Override
+				public void onMessage(Message msg) {
+					try {
+						String msgText = ((TextMessage) msg).getText();
+						System.out.println(msgText);
+					} catch (JMSException e) {
+						e.printStackTrace();
+					}
+				}
+			});
+
+		} catch (JMSException e) {
+			e.printStackTrace();
+		}
+	}
 }
