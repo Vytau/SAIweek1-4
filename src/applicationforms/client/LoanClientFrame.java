@@ -22,6 +22,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import mix.Constants;
 import mix.messaging.*;
 import mix.loan.*;
@@ -127,7 +129,7 @@ public class LoanClientFrame extends JFrame {
                 LoanRequest request = new LoanRequest(ssn, amount, time);
                 listModel.addElement(new RequestReply<LoanRequest, LoanReply>(request, null));
                 // to do:  send the JMS with request to Loan Broker
-                sendRequest("labas");
+                sendRequest(request);
             }
         });
         GridBagConstraints gbc_btnQueue = new GridBagConstraints();
@@ -184,7 +186,7 @@ public class LoanClientFrame extends JFrame {
         });
     }
 
-    private void connect(){
+    private void connect() {
         try {
             Properties props = new Properties();
             props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
@@ -208,10 +210,14 @@ public class LoanClientFrame extends JFrame {
         }
     }
 
-    private void sendRequest(String s){
+    private void sendRequest(LoanRequest loanRequest) {
         try {
+            // Serializing
+            Gson gson = new GsonBuilder().create();
+            String serLoanRequest = gson.toJson(loanRequest);
+
             // create a text message
-            Message msg = session.createTextMessage(s);
+            Message msg = session.createTextMessage(serLoanRequest);
             //msg.setJMSReplyTo(receiveDestination);
 
             // send the message

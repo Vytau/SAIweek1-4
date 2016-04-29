@@ -17,6 +17,8 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.border.EmptyBorder;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import mix.Constants;
 import mix.bank.*;
 import mix.loan.*;
@@ -145,6 +147,9 @@ public class LoanBrokerFrame extends JFrame {
 				public void onMessage(Message msg) {
 					try {
 						String msgText = ((TextMessage) msg).getText();
+						Gson gson = new GsonBuilder().create();
+						LoanRequest loanRequest = gson.fromJson(msgText, LoanRequest.class);
+						add(loanRequest);
 						System.out.println(msgText);
 					} catch (JMSException e) {
 						e.printStackTrace();

@@ -16,6 +16,7 @@
       <root url="jar://$PROJECT_DIR$/lib/geronimo-jms_1.1_spec-1.1.1.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/activemq-protobuf-1.1.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/activemq-broker-5.13.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/gson-2.2.3.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
