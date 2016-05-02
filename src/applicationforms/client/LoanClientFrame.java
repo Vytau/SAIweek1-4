@@ -46,7 +46,6 @@ public class LoanClientFrame extends JFrame {
 
     private Connection connection; // to connect to the ActiveMQ
     private Session session; // session for creating messages, producers and
-
     private Destination sendDestination; // reference to a queue/topic destination
     private MessageProducer producer; // for sending messages
 
@@ -219,7 +218,7 @@ public class LoanClientFrame extends JFrame {
             // create a text message
             Message msg = session.createTextMessage(serLoanRequest);
             //msg.setJMSReplyTo(receiveDestination);
-
+            System.out.println(msg.getJMSCorrelationID());
             // send the message
             producer.send(msg);
 
