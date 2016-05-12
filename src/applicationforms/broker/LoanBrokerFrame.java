@@ -33,12 +33,19 @@ public class LoanBrokerFrame extends JFrame {
     private DefaultListModel<JListLine> listModel = new DefaultListModel<JListLine>();
     private JList<JListLine> list;
 
-    private Connection connection; // to connect to the JMS
-    private Session session; // session for creating consumers
-    private Destination receiveDestination; // reference to a queue/topic destination
-    private MessageConsumer consumer; // for receiving messages
-    private Destination sendDestination;
-    private MessageProducer producer;
+    private Connection connectionToClient;
+    private Session sessionToClient;
+    private Destination receiveDestinationToClient;
+    private MessageConsumer consumerToClient;
+    private Destination sendDestinationToClient;
+    private MessageProducer producerToClient;
+
+    private Connection connectionToBank;
+    private Session sessionToBank;
+    private Destination receiveDestinationToBank;
+    private MessageConsumer consumerToBank;
+    private Destination sendDestinationToBank;
+    private MessageProducer producerToBank;
 
     /**
      * Create the frame.
@@ -116,7 +123,6 @@ public class LoanBrokerFrame extends JFrame {
         JListLine rr = getRequestReply(loanRequest);
         if (rr != null && bankReply != null) {
             rr.setBankReply(bankReply);
-            ;
             list.repaint();
         }
     }
@@ -132,21 +138,22 @@ public class LoanBrokerFrame extends JFrame {
 
             Context jndiContext = new InitialContext(props);
             ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-            connection = connectionFactory.createConnection();
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            connectionToClient = connectionFactory.createConnection();
+            sessionToClient = connectionToClient
+                    .createSession(false, Session.AUTO_ACKNOWLEDGE);
 
             // connect to the receiver destination
-            receiveDestination = (Destination) jndiContext.lookup(Constants.requestLoanClientChanel);
-            consumer = session.createConsumer(receiveDestination);
+            receiveDestinationToClient = (Destination) jndiContext.lookup(Constants.requestLoanClientChanel);
+            consumerToClient = sessionToClient.createConsumer(receiveDestinationToClient);
 
-            connection.start(); // this is needed to start receiving messages
+            connectionToClient.start(); // this is needed to start receiving messages
 
         } catch (NamingException | JMSException e) {
             e.printStackTrace();
         }
 
         try {
-            consumer.setMessageListener(new MessageListener() {
+            consumerToClient.setMessageListener(new MessageListener() {
 
                 @Override
                 public void onMessage(Message msg) {
@@ -157,6 +164,7 @@ public class LoanBrokerFrame extends JFrame {
                         add(loanRequest);
                         SendMessageToBank(new BankInterestRequest(loanRequest.getAmount(),
                                 loanRequest.getTime()));
+                        System.out.println(msg.getJMSCorrelationID());
                     } catch (JMSException e) {
                         e.printStackTrace();
                     }
@@ -183,21 +191,21 @@ public class LoanBrokerFrame extends JFrame {
 
             Context jndiContext = new InitialContext(props);
             ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-            connection = connectionFactory.createConnection();
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            connectionToBank = connectionFactory.createConnection();
+            sessionToBank = connectionToBank.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
             // connect to the receiver destination
-            receiveDestination = (Destination) jndiContext.lookup(Constants.replyLoanBankChanel);
-            consumer = session.createConsumer(receiveDestination);
+            receiveDestinationToBank = (Destination) jndiContext.lookup(Constants.replyLoanBankChanel);
+            consumerToBank = sessionToBank.createConsumer(receiveDestinationToBank);
 
-            connection.start(); // this is needed to start receiving messages
+            connectionToBank.start(); // this is needed to start receiving messages
 
         } catch (NamingException | JMSException e) {
             e.printStackTrace();
         }
 
         try {
-            consumer.setMessageListener(new MessageListener() {
+            consumerToBank.setMessageListener(new MessageListener() {
 
                 @Override
                 public void onMessage(Message msg) {
@@ -229,12 +237,12 @@ public class LoanBrokerFrame extends JFrame {
 
             Context jndiContext = new InitialContext(props);
             ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-            connection = connectionFactory.createConnection();
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            connectionToBank = connectionFactory.createConnection();
+            sessionToBank = connectionToBank.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
             // connect to the sender destination
-            sendDestination = (Destination) jndiContext.lookup(Constants.requestLoanBankChanel);
-            producer = session.createProducer(sendDestination);
+            sendDestinationToBank = (Destination) jndiContext.lookup(Constants.requestLoanBankChanel);
+            producerToBank = sessionToBank.createProducer(sendDestinationToBank);
         } catch (NamingException e) {
             e.printStackTrace();
         } catch (JMSException e) {
@@ -249,15 +257,14 @@ public class LoanBrokerFrame extends JFrame {
             String serBankRequest = gson.toJson(bankRequest);
 
             // create a text message
-            Message msg = session.createTextMessage(serBankRequest);
+            Message msg = sessionToBank.createTextMessage(serBankRequest);
             //msg.setJMSReplyTo(receiveDestination);
 
             // send the message
-            producer.send(msg);
+            producerToBank.send(msg);
 
         } catch (JMSException e) {
             e.printStackTrace();
         }
     }
-
 }
