@@ -166,10 +166,11 @@ public class JMSBankFrame extends JFrame {
                     try {
                         String msgText = ((TextMessage) msg).getText();
                         Gson gson = new GsonBuilder().create();
-                        BankInterestRequest interestRequest = gson.fromJson(msgText, BankInterestRequest.class);
+                        LoanRequest clientInterestRequest = gson.fromJson(msgText, LoanRequest.class);
 
-                        System.out.println(interestRequest);
-                        listModel.addElement(new RequestReply<BankInterestRequest, BankInterestReply>(interestRequest, null));
+                        listModel.addElement(new RequestReply<BankInterestRequest, BankInterestReply>
+                                (new BankInterestRequest(clientInterestRequest.getAmount(),
+                                        clientInterestRequest.getTime()), null));
                     } catch (JMSException e) {
                         e.printStackTrace();
                     }
@@ -181,7 +182,7 @@ public class JMSBankFrame extends JFrame {
         }
     }
 
-    private void connectToBroker(){
+    private void connectToBroker() {
         try {
             Properties props = new Properties();
             props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
@@ -205,7 +206,7 @@ public class JMSBankFrame extends JFrame {
         }
     }
 
-    private void sendReplyToBroker(BankInterestReply bankInterestReply){
+    private void sendReplyToBroker(BankInterestReply bankInterestReply) {
         try {
             // Serializing
             Gson gson = new GsonBuilder().create();

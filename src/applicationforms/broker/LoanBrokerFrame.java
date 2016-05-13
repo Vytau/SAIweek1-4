@@ -77,8 +77,8 @@ public class LoanBrokerFrame extends JFrame {
         scrollPane.setViewportView(list);
 
         subscribeToClient();
-        connectToClient();
-        subscribeToBank();
+        //connectToClient();
+        //subscribeToBank();
         connectToBank();
     }
 
@@ -162,8 +162,7 @@ public class LoanBrokerFrame extends JFrame {
                         Gson gson = new GsonBuilder().create();
                         LoanRequest loanRequest = gson.fromJson(msgText, LoanRequest.class);
                         add(loanRequest);
-                        SendMessageToBank(new BankInterestRequest(loanRequest.getAmount(),
-                                loanRequest.getTime()));
+                        SendMessageToBank(msgText);
                         System.out.println(msg.getJMSCorrelationID());
                     } catch (JMSException e) {
                         e.printStackTrace();
@@ -250,14 +249,11 @@ public class LoanBrokerFrame extends JFrame {
         }
     }
 
-    private void SendMessageToBank(BankInterestRequest bankRequest) {
+    private void SendMessageToBank(String serLoanRequest) {
         try {
-            // Serializing
-            Gson gson = new GsonBuilder().create();
-            String serBankRequest = gson.toJson(bankRequest);
 
             // create a text message
-            Message msg = sessionToBank.createTextMessage(serBankRequest);
+            Message msg = sessionToBank.createTextMessage(serLoanRequest);
             //msg.setJMSReplyTo(receiveDestination);
 
             // send the message

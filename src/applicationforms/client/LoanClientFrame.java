@@ -218,9 +218,12 @@ public class LoanClientFrame extends JFrame {
             // create a text message
             Message msg = session.createTextMessage(serLoanRequest);
             //msg.setJMSReplyTo(receiveDestination);
-            System.out.println(msg.getJMSCorrelationID());
+            System.out.println(msg.getJMSMessageID());
             // send the message
             producer.send(msg);
+            System.out.println(msg.getJMSMessageID());
+
+
 
         } catch (JMSException e) {
             e.printStackTrace();
