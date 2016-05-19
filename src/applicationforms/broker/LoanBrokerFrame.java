@@ -4,7 +4,7 @@ import java.awt.EventQueue;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.util.Properties;
+import java.util.*;
 
 import javax.jms.*;
 import javax.naming.Context;
@@ -32,6 +32,8 @@ public class LoanBrokerFrame extends JFrame {
     private JPanel contentPane;
     private DefaultListModel<JListLine> listModel = new DefaultListModel<JListLine>();
     private JList<JListLine> list;
+    private HashMap<String, LoanRequest> cash = new HashMap<String, LoanRequest>();
+
 
     private Connection connectionToClient;
     private Session sessionToClient;
@@ -78,7 +80,7 @@ public class LoanBrokerFrame extends JFrame {
 
         subscribeToClient();
         //connectToClient();
-        //subscribeToBank();
+        subscribeToBank();
         connectToBank();
     }
 
@@ -159,11 +161,17 @@ public class LoanBrokerFrame extends JFrame {
                 public void onMessage(Message msg) {
                     try {
                         String msgText = ((TextMessage) msg).getText();
+                        //Deserialize
                         Gson gson = new GsonBuilder().create();
                         LoanRequest loanRequest = gson.fromJson(msgText, LoanRequest.class);
+
+                        //add to list model and cash data
                         add(loanRequest);
-                        SendMessageToBank(msgText);
-                        System.out.println(msg.getJMSCorrelationID());
+                        cash.put(msg.getJMSMessageID(), loanRequest);
+
+                        //create bankrequest and send
+                        BankInterestRequest bankInterestRequest = new BankInterestRequest(loanRequest.getAmount(),loanRequest.getTime());
+                        SendMessageToBank(bankInterestRequest, msg.getJMSMessageID());
                     } catch (JMSException e) {
                         e.printStackTrace();
                     }
@@ -186,7 +194,7 @@ public class LoanBrokerFrame extends JFrame {
                     "org.apache.activemq.jndi.ActiveMQInitialContextFactory");
             props.setProperty(Context.PROVIDER_URL, "tcp://localhost:61616");
 
-            props.put(("queue." + Constants.requestLoanBankChanel), Constants.replyLoanBankChanel);
+            props.put(("queue." + Constants.replyLoanBankChanel), Constants.replyLoanBankChanel);
 
             Context jndiContext = new InitialContext(props);
             ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
@@ -210,9 +218,14 @@ public class LoanBrokerFrame extends JFrame {
                 public void onMessage(Message msg) {
                     try {
                         String msgText = ((TextMessage) msg).getText();
+                        //Deserialize
                         Gson gson = new GsonBuilder().create();
-                        LoanRequest loanRequest = gson.fromJson(msgText, LoanRequest.class);
+                        BankInterestReply bankReply = gson.fromJson(msgText, BankInterestReply.class);
 
+                        //
+                        LoanRequest tempRequest = cash.get(msg.getJMSCorrelationID());
+                        System.out.println(tempRequest);
+                        add(tempRequest, bankReply);
 
                     } catch (JMSException e) {
                         e.printStackTrace();
@@ -249,12 +262,15 @@ public class LoanBrokerFrame extends JFrame {
         }
     }
 
-    private void SendMessageToBank(String serLoanRequest) {
+    private void SendMessageToBank(BankInterestRequest bankInterestRequest, String msgID) {
         try {
+            // Serializing
+            Gson gson = new GsonBuilder().create();
+            String serBankRequest = gson.toJson(bankInterestRequest);
 
             // create a text message
-            Message msg = sessionToBank.createTextMessage(serLoanRequest);
-            //msg.setJMSReplyTo(receiveDestination);
+            Message msg = sessionToBank.createTextMessage(serBankRequest);
+            msg.setJMSCorrelationID(msgID);
 
             // send the message
             producerToBank.send(msg);

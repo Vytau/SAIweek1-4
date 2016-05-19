@@ -39,6 +39,8 @@ public class JMSBankFrame extends JFrame {
     private JPanel contentPane;
     private JTextField tfReply;
     private DefaultListModel<RequestReply<BankInterestRequest, BankInterestReply>> listModel = new DefaultListModel<RequestReply<BankInterestRequest, BankInterestReply>>();
+    private java.util.HashMap<BankInterestRequest, String> cash = new java.util.HashMap<BankInterestRequest, String>();
+
 
     private Connection connection; // to connect to the JMS
     private Session session; // session for creating consumers
@@ -120,7 +122,9 @@ public class JMSBankFrame extends JFrame {
                     rr.setReply(reply);
                     list.repaint();
                     // todo: sent JMS message with the reply to Loan Broker
-                    sendReplyToBroker(reply);
+
+                    String correlationID = cash.get(rr.getRequest());
+                    sendReplyToBroker(reply, correlationID);
                 }
             }
         });
@@ -165,12 +169,14 @@ public class JMSBankFrame extends JFrame {
                 public void onMessage(Message msg) {
                     try {
                         String msgText = ((TextMessage) msg).getText();
+                        //Deserialize
                         Gson gson = new GsonBuilder().create();
-                        LoanRequest clientInterestRequest = gson.fromJson(msgText, LoanRequest.class);
+                        BankInterestRequest bankInterestRequest = gson.fromJson(msgText, BankInterestRequest.class);
 
+                        //add to list and cash with correlation id
                         listModel.addElement(new RequestReply<BankInterestRequest, BankInterestReply>
-                                (new BankInterestRequest(clientInterestRequest.getAmount(),
-                                        clientInterestRequest.getTime()), null));
+                                (bankInterestRequest, null));
+                        cash.put(bankInterestRequest, msg.getJMSCorrelationID());
                     } catch (JMSException e) {
                         e.printStackTrace();
                     }
@@ -206,7 +212,7 @@ public class JMSBankFrame extends JFrame {
         }
     }
 
-    private void sendReplyToBroker(BankInterestReply bankInterestReply) {
+    private void sendReplyToBroker(BankInterestReply bankInterestReply, String correlationId) {
         try {
             // Serializing
             Gson gson = new GsonBuilder().create();
@@ -214,7 +220,7 @@ public class JMSBankFrame extends JFrame {
 
             // create a text message
             Message msg = session.createTextMessage(serBankRequest);
-            msg.getJMSCorrelationID();
+            msg.setJMSCorrelationID(correlationId);
 
             // send the message
             producer.send(msg);

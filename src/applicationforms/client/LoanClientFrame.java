@@ -1,12 +1,10 @@
 package applicationforms.client;
 
-import java.awt.EventQueue;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Properties;
+import java.util.*;
+import java.util.HashMap;
 
 import javax.jms.*;
 import javax.naming.Context;
@@ -25,6 +23,7 @@ import javax.swing.border.EmptyBorder;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import mix.Constants;
+import mix.bank.*;
 import mix.messaging.*;
 import mix.loan.*;
 
@@ -38,6 +37,7 @@ public class LoanClientFrame extends JFrame {
     private JTextField tfSSN;
     private DefaultListModel<RequestReply<LoanRequest, LoanReply>> listModel = new DefaultListModel<RequestReply<LoanRequest, LoanReply>>();
     private JList<RequestReply<LoanRequest, LoanReply>> requestReplyList;
+    private HashMap<String, LoanRequest> cash = new HashMap<String, LoanRequest>();
 
     private JTextField tfAmount;
     private JLabel lblNewLabel;
@@ -46,8 +46,13 @@ public class LoanClientFrame extends JFrame {
 
     private Connection connection; // to connect to the ActiveMQ
     private Session session; // session for creating messages, producers and
+
     private Destination sendDestination; // reference to a queue/topic destination
     private MessageProducer producer; // for sending messages
+
+    private Destination receiverDestination;
+    private MessageConsumer consumer;
+
 
     /**
      * Create the frame.
@@ -150,6 +155,7 @@ public class LoanClientFrame extends JFrame {
         scrollPane.setViewportView(requestReplyList);
 
         connect();
+        subscribe();
     }
 
     /**
@@ -218,15 +224,17 @@ public class LoanClientFrame extends JFrame {
             // create a text message
             Message msg = session.createTextMessage(serLoanRequest);
             //msg.setJMSReplyTo(receiveDestination);
-            System.out.println(msg.getJMSMessageID());
+
             // send the message
             producer.send(msg);
-            System.out.println(msg.getJMSMessageID());
-
-
+            cash.put(msg.getJMSMessageID(), loanRequest);
 
         } catch (JMSException e) {
             e.printStackTrace();
         }
+    }
+
+    private void subscribe(){
+
     }
 }
