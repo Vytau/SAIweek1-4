@@ -79,7 +79,7 @@ public class LoanBrokerFrame extends JFrame {
         scrollPane.setViewportView(list);
 
         subscribeToClient();
-        //connectToClient();
+        connectToClient();
         subscribeToBank();
         connectToBank();
     }
@@ -169,7 +169,7 @@ public class LoanBrokerFrame extends JFrame {
                         add(loanRequest);
                         cash.put(msg.getJMSMessageID(), loanRequest);
 
-                        //create bankrequest and send
+                        //create bankRequest and send
                         BankInterestRequest bankInterestRequest = new BankInterestRequest(loanRequest.getAmount(),loanRequest.getTime());
                         SendMessageToBank(bankInterestRequest, msg.getJMSMessageID());
                     } catch (JMSException e) {
@@ -184,7 +184,27 @@ public class LoanBrokerFrame extends JFrame {
     }
 
     private void connectToClient() {
+        try {
+            Properties props = new Properties();
+            props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
+                    "org.apache.activemq.jndi.ActiveMQInitialContextFactory");
+            props.setProperty(Context.PROVIDER_URL, "tcp://localhost:61616");
 
+            props.put(("queue." + Constants.replyLoanClientChanel), Constants.replyLoanClientChanel);
+
+            Context jndiContext = new InitialContext(props);
+            ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
+            connectionToClient = connectionFactory.createConnection();
+            sessionToClient = connectionToClient.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+            // connect to the sender destination
+            sendDestinationToClient = (Destination) jndiContext.lookup(Constants.replyLoanClientChanel);
+            producerToClient = sessionToClient.createProducer(sendDestinationToClient);
+        } catch (NamingException e) {
+            e.printStackTrace();
+        } catch (JMSException e) {
+            e.printStackTrace();
+        }
     }
 
     private void subscribeToBank() {
@@ -222,11 +242,13 @@ public class LoanBrokerFrame extends JFrame {
                         Gson gson = new GsonBuilder().create();
                         BankInterestReply bankReply = gson.fromJson(msgText, BankInterestReply.class);
 
-                        //
+                        //Match reply with the right request
                         LoanRequest tempRequest = cash.get(msg.getJMSCorrelationID());
-                        System.out.println(tempRequest);
                         add(tempRequest, bankReply);
 
+                        //make loan reply and send it with correlation id
+                        LoanReply loanReply = new LoanReply(bankReply.getInterest(),bankReply.getQuoteId());
+                        SendMessageToClient(loanReply, msg.getJMSCorrelationID());
                     } catch (JMSException e) {
                         e.printStackTrace();
                     }
@@ -274,7 +296,23 @@ public class LoanBrokerFrame extends JFrame {
 
             // send the message
             producerToBank.send(msg);
+        } catch (JMSException e) {
+            e.printStackTrace();
+        }
+    }
 
+    private void SendMessageToClient(LoanReply loanReply, String msgID){
+        try{
+            // Serializing
+            Gson gson = new GsonBuilder().create();
+            String serLoanReply = gson.toJson(loanReply);
+
+            // create a text message
+            Message msg = sessionToClient.createTextMessage(serLoanReply);
+            msg.setJMSCorrelationID(msgID);
+
+            // send the message
+            producerToClient.send(msg);
         } catch (JMSException e) {
             e.printStackTrace();
         }

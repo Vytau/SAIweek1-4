@@ -37,7 +37,7 @@ public class LoanClientFrame extends JFrame {
     private JTextField tfSSN;
     private DefaultListModel<RequestReply<LoanRequest, LoanReply>> listModel = new DefaultListModel<RequestReply<LoanRequest, LoanReply>>();
     private JList<RequestReply<LoanRequest, LoanReply>> requestReplyList;
-    private HashMap<String, LoanRequest> cash = new HashMap<String, LoanRequest>();
+    private HashMap<String, LoanRequest> cash = new HashMap<>();
 
     private JTextField tfAmount;
     private JLabel lblNewLabel;
@@ -50,7 +50,7 @@ public class LoanClientFrame extends JFrame {
     private Destination sendDestination; // reference to a queue/topic destination
     private MessageProducer producer; // for sending messages
 
-    private Destination receiverDestination;
+    private Destination receiveDestination;
     private MessageConsumer consumer;
 
 
@@ -235,6 +235,55 @@ public class LoanClientFrame extends JFrame {
     }
 
     private void subscribe(){
+        try {
+            Properties props = new Properties();
+            props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
+                    "org.apache.activemq.jndi.ActiveMQInitialContextFactory");
+            props.setProperty(Context.PROVIDER_URL, "tcp://localhost:61616");
 
+            props.put(("queue." + Constants.replyLoanClientChanel), Constants.replyLoanClientChanel);
+
+            Context jndiContext = new InitialContext(props);
+            ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
+            connection = connectionFactory.createConnection();
+            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+            // connect to the receiver destination
+            receiveDestination = (Destination) jndiContext.lookup(Constants.replyLoanClientChanel);
+            consumer = session.createConsumer(receiveDestination);
+
+            connection.start(); // this is needed to start receiving messages
+
+        } catch (NamingException | JMSException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            consumer.setMessageListener(new MessageListener() {
+
+                @Override
+                public void onMessage(Message msg) {
+                    try {
+                        String msgText = ((TextMessage) msg).getText();
+
+                        //Deserialize
+                        Gson gson = new GsonBuilder().create();
+                        LoanReply loanReply = gson.fromJson(msgText, LoanReply.class);
+
+                        //Match reply with the right request
+                        LoanRequest tempRequest = cash.get(msg.getJMSCorrelationID());
+
+                        getRequestReply(tempRequest).setReply(loanReply);
+                        requestReplyList.repaint();
+
+                    } catch (JMSException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+        } catch (JMSException e) {
+            e.printStackTrace();
+        }
     }
 }
