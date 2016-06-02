@@ -1,24 +1,15 @@
 package applicationforms.client;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import mix.Constants;
 import mix.loan.LoanReply;
 import mix.loan.LoanRequest;
 import mix.loan.gateway.LoanClientAppGateway;
 import mix.messaging.RequestReply;
 
-import javax.jms.*;
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.HashMap;
-import java.util.Properties;
 
 public class LoanClientFrame extends JFrame {
 
@@ -30,7 +21,6 @@ public class LoanClientFrame extends JFrame {
     private JTextField tfSSN;
     private DefaultListModel<RequestReply<LoanRequest, LoanReply>> listModel = new DefaultListModel<RequestReply<LoanRequest, LoanReply>>();
     private JList<RequestReply<LoanRequest, LoanReply>> requestReplyList;
-    private HashMap<String, LoanRequest> cash = new HashMap<>();
 
     private JTextField tfAmount;
     private JLabel lblNewLabel;
@@ -38,16 +28,6 @@ public class LoanClientFrame extends JFrame {
     private JTextField tfTime;
 
     private LoanClientAppGateway loanClientApp;
-
-    private Connection connection; // to connect to the ActiveMQ
-    private Session session; // session for creating messages, producers and
-
-    private Destination sendDestination; // reference to a queue/topic destination
-    private MessageProducer producer; // for sending messages
-
-    private Destination receiveDestination;
-    private MessageConsumer consumer;
-
 
     /**
      * Create the frame.
@@ -127,8 +107,7 @@ public class LoanClientFrame extends JFrame {
 
                 LoanRequest request = new LoanRequest(ssn, amount, time);
                 listModel.addElement(new RequestReply<LoanRequest, LoanReply>(request, null));
-                // to do:  send the JMS with request to Loan Broker
-                //sendRequest(request);
+                // send the JMS with request to Loan Broker
                 loanClientApp.applyForLoan(request);
             }
         });
@@ -150,8 +129,7 @@ public class LoanClientFrame extends JFrame {
         requestReplyList = new JList<RequestReply<LoanRequest, LoanReply>>(listModel);
         scrollPane.setViewportView(requestReplyList);
 
-        //connect();
-        //subscribe();
+        //on message received
         loanClientApp = new LoanClientAppGateway() {
             @Override
             public void onLoanReplyArrived(LoanRequest loanRequest, LoanReply loanReply) {
@@ -192,100 +170,5 @@ public class LoanClientFrame extends JFrame {
                 }
             }
         });
-    }
-
-    private void connect() {
-        try {
-            Properties props = new Properties();
-            props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
-                    "org.apache.activemq.jndi.ActiveMQInitialContextFactory");
-            props.setProperty(Context.PROVIDER_URL, "tcp://localhost:61616");
-
-            props.put(("queue." + Constants.requestLoanClientChanel), Constants.requestLoanClientChanel);
-
-            Context jndiContext = new InitialContext(props);
-            ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-            connection = connectionFactory.createConnection();
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-
-            // connect to the sender destination
-            sendDestination = (Destination) jndiContext.lookup(Constants.requestLoanClientChanel);
-            producer = session.createProducer(sendDestination);
-        } catch (NamingException e) {
-            e.printStackTrace();
-        } catch (JMSException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void sendRequest(LoanRequest loanRequest) {
-        try {
-            // Serializing
-            Gson gson = new GsonBuilder().create();
-            String serLoanRequest = gson.toJson(loanRequest);
-
-            // create a text message
-            Message msg = session.createTextMessage(serLoanRequest);
-
-            // send the message
-            producer.send(msg);
-            cash.put(msg.getJMSMessageID(), loanRequest);
-
-        } catch (JMSException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void subscribe(){
-        try {
-            Properties props = new Properties();
-            props.setProperty(Context.INITIAL_CONTEXT_FACTORY,
-                    "org.apache.activemq.jndi.ActiveMQInitialContextFactory");
-            props.setProperty(Context.PROVIDER_URL, "tcp://localhost:61616");
-
-            props.put(("queue." + Constants.replyLoanClientChanel), Constants.replyLoanClientChanel);
-
-            Context jndiContext = new InitialContext(props);
-            ConnectionFactory connectionFactory = (ConnectionFactory) jndiContext.lookup("ConnectionFactory");
-            connection = connectionFactory.createConnection();
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-
-            // connect to the receiver destination
-            receiveDestination = (Destination) jndiContext.lookup(Constants.replyLoanClientChanel);
-            consumer = session.createConsumer(receiveDestination);
-
-            connection.start(); // this is needed to start receiving messages
-
-        } catch (NamingException | JMSException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            consumer.setMessageListener(new MessageListener() {
-
-                @Override
-                public void onMessage(Message msg) {
-                    try {
-                        String msgText = ((TextMessage) msg).getText();
-
-                        //Deserialize
-                        Gson gson = new GsonBuilder().create();
-                        LoanReply loanReply = gson.fromJson(msgText, LoanReply.class);
-
-                        //Match reply with the right request
-                        LoanRequest tempRequest = cash.get(msg.getJMSCorrelationID());
-
-                        getRequestReply(tempRequest).setReply(loanReply);
-                        requestReplyList.repaint();
-
-                    } catch (JMSException e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
-
-        } catch (JMSException e) {
-            e.printStackTrace();
-        }
     }
 }
