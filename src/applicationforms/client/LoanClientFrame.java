@@ -164,7 +164,7 @@ public class LoanClientFrame extends JFrame {
             @Override
             public void onLoanReplyArrived(LoanRequest loanRequest, LoanReply loanReply) {
                 //ToDo on message
-
+                System.out.print("gauna");
             }
         };
     }

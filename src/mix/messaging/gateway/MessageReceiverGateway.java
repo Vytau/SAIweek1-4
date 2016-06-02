@@ -41,6 +41,10 @@ public class MessageReceiverGateway {
     }
 
     public void setListener(MessageListener messageListener){
-
+        try {
+            consumer.setMessageListener(messageListener);
+        } catch (JMSException e) {
+            e.printStackTrace();
+        }
     }
 }
