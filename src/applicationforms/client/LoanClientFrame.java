@@ -24,6 +24,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import mix.Constants;
 import mix.bank.*;
+import mix.loan.gateway.LoanClientAppGateway;
 import mix.messaging.*;
 import mix.loan.*;
 
@@ -43,6 +44,8 @@ public class LoanClientFrame extends JFrame {
     private JLabel lblNewLabel;
     private JLabel lblNewLabel_1;
     private JTextField tfTime;
+
+    private LoanClientAppGateway loanClientApp;
 
     private Connection connection; // to connect to the ActiveMQ
     private Session session; // session for creating messages, producers and
@@ -133,7 +136,8 @@ public class LoanClientFrame extends JFrame {
                 LoanRequest request = new LoanRequest(ssn, amount, time);
                 listModel.addElement(new RequestReply<LoanRequest, LoanReply>(request, null));
                 // to do:  send the JMS with request to Loan Broker
-                sendRequest(request);
+                //sendRequest(request);
+                loanClientApp.applyForLoan(request);
             }
         });
         GridBagConstraints gbc_btnQueue = new GridBagConstraints();
@@ -154,8 +158,15 @@ public class LoanClientFrame extends JFrame {
         requestReplyList = new JList<RequestReply<LoanRequest, LoanReply>>(listModel);
         scrollPane.setViewportView(requestReplyList);
 
-        connect();
-        subscribe();
+        //connect();
+        //subscribe();
+        loanClientApp = new LoanClientAppGateway() {
+            @Override
+            public void onLoanReplyArrived(LoanRequest loanRequest, LoanReply loanReply) {
+                //ToDo on message
+
+            }
+        };
     }
 
     /**
@@ -223,7 +234,6 @@ public class LoanClientFrame extends JFrame {
 
             // create a text message
             Message msg = session.createTextMessage(serLoanRequest);
-            //msg.setJMSReplyTo(receiveDestination);
 
             // send the message
             producer.send(msg);
