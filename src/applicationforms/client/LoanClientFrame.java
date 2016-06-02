@@ -1,32 +1,24 @@
 package applicationforms.client;
 
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.*;
-import java.util.HashMap;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import mix.Constants;
+import mix.loan.LoanReply;
+import mix.loan.LoanRequest;
+import mix.loan.gateway.LoanClientAppGateway;
+import mix.messaging.RequestReply;
 
 import javax.jms.*;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import mix.Constants;
-import mix.bank.*;
-import mix.loan.gateway.LoanClientAppGateway;
-import mix.messaging.*;
-import mix.loan.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.HashMap;
+import java.util.Properties;
 
 public class LoanClientFrame extends JFrame {
 
@@ -163,8 +155,8 @@ public class LoanClientFrame extends JFrame {
         loanClientApp = new LoanClientAppGateway() {
             @Override
             public void onLoanReplyArrived(LoanRequest loanRequest, LoanReply loanReply) {
-                //ToDo on message
-                System.out.print("gauna");
+                getRequestReply(loanRequest).setReply(loanReply);
+                requestReplyList.repaint();
             }
         };
     }
